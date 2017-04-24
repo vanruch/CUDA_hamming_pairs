@@ -34,88 +34,150 @@ using namespace thrust;
 
 
 
-class device_string
-{
+//class device_string
+//{
+//private:
+//
+//public:
+//	int cstr_len;
+//	int ones=-1;
+//	char* raw;
+//	thrust::device_ptr<char> cstr;
+//	static char* pool_raw;
+//	static thrust::device_ptr<char> pool_cstr;
+//	static thrust::device_ptr<char> pool_top;
+//
+//
+//	__host__ static void init(int size=1024, int len=1024)
+//	{	 
+//		static bool v = true;
+//		if (v)
+//		{
+//			v = false;
+//
+//			const int POOL_SZ = size*len;
+//			cout << "malloc\n";
+//			pool_cstr = thrust::device_malloc<char>(POOL_SZ*2);
+//			cout << "malloc end\n";
+//			pool_raw = (char*)raw_pointer_cast(pool_cstr);
+//
+//			pool_top = pool_cstr;
+//		}
+//	}
+//	__host__ static void fini()
+//	{
+//		init();
+//		thrust::device_free(pool_cstr);
+//	}
+//
+//	__host__ __device__ device_string(const device_string& s)
+//	{
+//		cstr_len = s.cstr_len;
+//		raw = s.raw;
+//		cstr = s.cstr;
+//	}
+//
+//	__host__ __device__ void calcOnes(){
+//		ones = 0;
+//		for (size_t i = 0; i < cstr_len; i++)
+//		{
+//			if (cstr[i] == '1')
+//				ones++;
+//		}
+//	}
+//
+//	__host__ device_string(const std::string& s)
+//		:
+//		cstr_len(s.length())
+//	{
+//		init();
+//
+//		cstr = pool_top;
+//		pool_top += cstr_len + 1;
+//		raw = raw_pointer_cast(cstr);
+//
+//		cudaMemcpy(raw, s.c_str(), cstr_len + 1, cudaMemcpyHostToDevice);
+//	}
+//	__host__ __device__ device_string()
+//		:
+//		cstr_len(-1),
+//		raw(0)
+//	{}
+//
+//
+//
+//	__host__ operator std::string()
+//	{
+//		std::string ret;
+//		thrust::copy(cstr, cstr + cstr_len, back_inserter(ret));
+//		return ret;
+//	}
+//};
+class device_bitset {
 private:
-
 public:
-	int cstr_len;
-	int ones=-1;
-	char* raw;
-	thrust::device_ptr<char> cstr;
-	static char* pool_raw;
-	static thrust::device_ptr<char> pool_cstr;
-	static thrust::device_ptr<char> pool_top;
+	device_vector<uint32_t> numbers;
+	int bitLength;
+	__host__ device_bitset()
+	{
 
-
-	__host__ static void init(int size=1024, int len=1024)
-	{	 
-		static bool v = true;
-		if (v)
-		{
-			v = false;
-
-			const int POOL_SZ = size*len;
-			cout << "malloc\n";
-			pool_cstr = thrust::device_malloc<char>(POOL_SZ*2);
-			cout << "malloc end\n";
-			pool_raw = (char*)raw_pointer_cast(pool_cstr);
-
-			pool_top = pool_cstr;
+	}
+	__host__ device_bitset(int length)
+	{		
+		bitLength = length;
+		while (length > 0) {
+			numbers.push_back(0);
+			length -= sizeof(uint32_t);
 		}
 	}
-	__host__ static void fini()
+	__host__ device_bitset(string s)
 	{
-		init();
-		thrust::device_free(pool_cstr);
-	}
-
-	__host__ __device__ device_string(const device_string& s)
-	{
-		cstr_len = s.cstr_len;
-		raw = s.raw;
-		cstr = s.cstr;
-	}
-
-	__host__ __device__ void calcOnes(){
-		ones = 0;
-		for (size_t i = 0; i < cstr_len; i++)
+		bitLength = s.length();
+		for (int i = 0; i < s.length(); i+=sizeof(uint32_t))
 		{
-			if (cstr[i] == '1')
-				ones++;
+			uint32_t t = 0;
+			for (int j = 0; j < sizeof(uint32_t); j++)
+			{
+				if (i + j >= s.length() || s[i + j] == '0') {
+					t *= 2;
+				}
+				else {
+					t = t * 2 + 1;
+				}
+			}
+			numbers.push_back(t);
 		}
 	}
-
-	__host__ device_string(const std::string& s)
-		:
-		cstr_len(s.length())
-	{
-		init();
-
-		cstr = pool_top;
-		pool_top += cstr_len + 1;
-		raw = raw_pointer_cast(cstr);
-
-		cudaMemcpy(raw, s.c_str(), cstr_len + 1, cudaMemcpyHostToDevice);
+	__device__ int bitCount() {
+		int r = 0;
+		unsigned int uCount;
+		for (int i = 0; i < numbers.size(); i++)
+		{
+			uCount= numbers[i] - ((numbers[i] >> 1) & 033333333333) - ((numbers[i] >> 2) & 011111111111);
+			r+= ((uCount + (uCount >> 3)) & 030707070707) % 63;
+		}
+		return r;
 	}
-	__host__ __device__ device_string()
-		:
-		cstr_len(-1),
-		raw(0)
-	{}
-
-
-
-	__host__ operator std::string()
-	{
-		std::string ret;
-		thrust::copy(cstr, cstr + cstr_len, back_inserter(ret));
-		return ret;
+	__host__ operator string() {
+		host_vector<uint32_t> h_bits = numbers;
+		string s;
+		s.resize(bitLength);
+		for (int i = 0; i < bitLength; i++)
+		{
+			s[i] = '0' + (h_bits[i / sizeof(uint32_t)] & (1 << (i % sizeof(uint32_t))));
+		}
+		return s;
 	}
 };
-device_ptr<char> device_string::pool_cstr;
-device_ptr<char> device_string::pool_top;
-char* device_string::pool_raw;
+__device__ device_bitset operator ^(const device_bitset &a, const device_bitset &b) {
+	device_bitset r(a.bitLength);
+	for (int i = 0; i < a.numbers.size(); i++)
+	{
+		r.numbers[i] = a.numbers[i] ^ b.numbers[i];
+	}
+	return r;
+}
+
 __global__ void countKernel(int *pos, const int *ones, int size)
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
@@ -124,18 +186,11 @@ __global__ void countKernel(int *pos, const int *ones, int size)
 
 }
 
-__device__ bool match(const device_string *words, int a, int b) {
-	int c = 0;
-	for (int i = 0; i < words[0].cstr_len; i++)
-	{
-		if (words[a].cstr[i] != words[b].cstr[i])
-			c++;
-		if (c > 1) return false;
-	}
-	return c == 1;
+__device__ bool match(const device_bitset *words, int a, int b) {
+	return (words[a] ^ words[b]).bitCount() == 1;
 }
 
-__global__ void findNeighborsKernel(device_string *words, int* ones, int *positions, int size, int len, int* res, int* cnt)
+__global__ void findNeighborsKernel(device_bitset *words, int* ones, int *positions, int size, int len, int* res, int* cnt)
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	if (i >= size) return;
@@ -156,9 +211,9 @@ __global__ void findNeighborsKernel(device_string *words, int* ones, int *positi
 
 
 
-void readData(host_vector<device_string> &vec, int size, int wordLen) {
+void readData(host_vector<device_bitset> &vec, int size, int wordLen) {
 	
-	vec = host_vector<device_string>(size);
+	vec = host_vector<device_bitset>(size);
 	for (int i = 0; i < size-2; i++)
 	{
 		string s;
@@ -166,34 +221,28 @@ void readData(host_vector<device_string> &vec, int size, int wordLen) {
 		{
 			s.append(rand() % 2 ? "0" : "1");
 		}
-		vec[i] = device_string(s);
+		vec[i] = device_bitset(s);
 	}
 	string s;
 	for (int j = 0; j < wordLen; j++)
 	{
 		s.append("0");
 	}
-	vec[size-2] = device_string(s);
+	vec[size-2] = device_bitset(s);
 	s.replace(0, 1, "1");
-	vec[size - 1] = device_string(s);
+	vec[size - 1] = device_bitset(s);
 }
 struct CalcOnes
 {
 
-	__device__ __host__ int operator()(device_string& s) {
+	__device__ __host__ int operator()(device_bitset& s) {
 		
-		int ones = 0;
-		for (size_t i = 0; i < s.cstr_len; i++)
-		{
-			if (s.cstr[i] == '1')
-				ones++;
-		}
-		return ones;
+		return s.bitCount();
 		
 	}
 };
 
-void calcVectors(device_vector<device_string> &d_words, device_vector<int> &ones, device_vector<int> &positions, int size) {
+void calcVectors(device_vector<device_bitset> &d_words, device_vector<int> &ones, device_vector<int> &positions, int size) {
 
 	thrust::transform(d_words.begin(), d_words.end(), ones.begin(), CalcOnes());
 	cout << "sorting" << endl;
@@ -214,19 +263,21 @@ struct Comp {
 	}
 };
 
-struct GetStr {
-	__host__ __device__ char* operator()(const device_string &s) {
-		return s.raw;
+struct GetRawPtr {
+	__host__ __device__ uint32_t* operator()(device_bitset &s){
+		return raw_pointer_cast(s.numbers.data());
 	}
 };
 
-void findPairs(device_vector<device_string> &d_words, device_vector<int> &ones, device_vector<int> &positions, int size) {
-	int* d_pos = thrust::raw_pointer_cast(positions.data());
-	device_string* str = raw_pointer_cast(d_words.data());
-	int* d_ones = raw_pointer_cast(ones.data());
-	cout << "AAAAAAAA\n";
-	//findNeighborsKernel << <(size + 256) / 256, 256 >> > (str, d_ones, d_pos, size);
-}
+//void findPairs(device_vector<device_bitset> &d_words, device_vector<int> &ones, device_vector<int> &positions, int size) {
+//	int* d_pos = thrust::raw_pointer_cast(positions.data());
+//	device_string* str = raw_pointer_cast(d_words.data());
+//	int* d_ones = raw_pointer_cast(ones.data());
+//	cout << "AAAAAAAA\n";
+//	//findNeighborsKernel << <(size + 256) / 256, 256 >> > (str, d_ones, d_pos, size);
+//}
+
+
 __device__ int counter;
 __global__ void hammingKernel(char* str1, char* str2, int len)
 {
@@ -235,8 +286,8 @@ __global__ void hammingKernel(char* str1, char* str2, int len)
 		atomicAdd(&counter, 1);
 }
 
-vector<std::pair<string,string>> cudaFindPairs(host_vector<device_string> &words, int size, int len) {
-	device_vector<device_string> d_words = words;
+vector<std::pair<string,string>> cudaFindPairs(host_vector<device_bitset> &words, int size, int len) {
+	device_vector<device_bitset> d_words = words;
 	device_vector<int> ones = device_vector<int>(size);
 	device_vector<int> positions = device_vector<int>(len);
 
@@ -244,7 +295,7 @@ vector<std::pair<string,string>> cudaFindPairs(host_vector<device_string> &words
 
 	sort_by_key(ones.begin(), ones.end(), d_words.begin());
 	int* d_pos = thrust::raw_pointer_cast(positions.data());
-	device_string* str = raw_pointer_cast(d_words.data());
+	device_bitset* bits = raw_pointer_cast(d_words.data());
 	int* d_ones = raw_pointer_cast(ones.data());
 	device_vector<int> res = device_vector<int>(size * 2, 0);
 	int* d_res = raw_pointer_cast(res.data());
@@ -255,16 +306,16 @@ vector<std::pair<string,string>> cudaFindPairs(host_vector<device_string> &words
 	countKernel << <(size + 256) / 256, 256 >> > (d_pos, d_ones, size);
 
 	thrust::inclusive_scan(positions.begin(), positions.end(), positions.begin());
-	device_vector<char*> d_str = device_vector<char*>(size);
-	auto s = device_string::pool_raw;
+	device_vector<uint32_t*> d_bts = device_vector<uint32_t*>(size);
+	//auto s = device_string::pool_raw;
 	words = d_words;
 	//d_words.clear();
-	thrust::transform(d_words.begin(), d_words.end(), d_str.begin(), GetStr());
+	thrust::transform(d_words.begin(), d_words.end(), d_bts.begin(), GetRawPtr());
 	//auto t = (&d_words[0]).get()->cstr; 
 	//host_vector<char*> hh = d_str;
 	host_vector<int> pairs;
 	if (size > len) {
-		findNeighborsKernel << <(size + 256) / 256, 256 >> > (str, d_ones, d_pos, size, len, d_res, d_cnt);
+		findNeighborsKernel << <(size + 256) / 256, 256 >> > (bits, d_ones, d_pos, size, len, d_res, d_cnt);
 		host_vector<int> hcnt = cnt;
 		h_cnt = hcnt[0];
 		pairs = res;
@@ -293,7 +344,7 @@ vector<std::pair<string,string>> cudaFindPairs(host_vector<device_string> &words
 				);*/
 				h_counter = 0;
 				cudaMemcpyToSymbol(counter, &h_counter, sizeof(int));
-				hammingKernel << <(len + 256) / 256, 256 >> > (d_str[i], d_str[j], len);
+				hammingKernel << <(len + 256) / 256, 256 >> > (d_bts[i], d_bts[j], len);
 				//cudaThreadSynchronize();
 				cudaMemcpyFromSymbol(&h_counter, counter, sizeof(int));
 				if (h_counter == 1) {
@@ -314,7 +365,7 @@ vector<std::pair<string,string>> cudaFindPairs(host_vector<device_string> &words
 	return p;
 }
 
-vector<std::pair<string, string>> hostFindPairs(host_vector<device_string> &words, int size, int len) {
+vector<std::pair<string, string>> hostFindPairs(host_vector<device_bitset> &words, int size, int len) {
 	vector<std::pair<string, string>> res;
 	vector<string> w;
 	for each (auto s in words)
