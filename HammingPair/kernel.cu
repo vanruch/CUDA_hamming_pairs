@@ -25,9 +25,9 @@
 #include <thrust/execution_policy.h>
 #include <thrust\scan.h>
 
-#define SIZE 2000
+#define SIZE 256
 #define LENGTH 1000
-
+#define SIZEOF (sizeof(uint32_t)*8)
 using namespace std;
 using namespace thrust;
 
@@ -116,27 +116,40 @@ using namespace thrust;
 class device_bitset {
 private:
 public:
-	device_vector<uint32_t> numbers;
-	int bitLength;
-	__host__ device_bitset()
+	uint32_t* numbers;
+	int bitLength,size;
+	__host__  __device__ device_bitset()
 	{
 
 	}
 	__host__ device_bitset(int length)
-	{		
+	{	
+		cudaMalloc(&numbers, sizeof(uint32_t)*((length+ SIZEOF) / SIZEOF));
+		uint32_t* h_numbers;
+		h_numbers = (uint32_t*)malloc(sizeof(uint32_t)*((length + SIZEOF) / SIZEOF));
 		bitLength = length;
+		int i = 0;
 		while (length > 0) {
-			numbers.push_back(0);
-			length -= sizeof(uint32_t);
+			h_numbers[i++] = 0;
+			length -= SIZEOF;
 		}
+		size = i;
+		cudaMemcpy(numbers, h_numbers, sizeof(uint32_t)*((length + SIZEOF) / SIZEOF), cudaMemcpyHostToDevice);
 	}
+
+	
+
 	__host__ device_bitset(string s)
 	{
 		bitLength = s.length();
-		for (int i = 0; i < s.length(); i+=sizeof(uint32_t))
+		cudaMalloc(&numbers, sizeof(uint32_t)*((bitLength + SIZEOF) / SIZEOF));
+		uint32_t* h_numbers;
+		h_numbers = (uint32_t*)malloc(sizeof(uint32_t)*((bitLength + SIZEOF) / SIZEOF));
+		int l = 0;
+		for (int i = 0; i < s.length(); i+= SIZEOF)
 		{
 			uint32_t t = 0;
-			for (int j = 0; j < sizeof(uint32_t); j++)
+			for (int j = 0; j < SIZEOF; j++)
 			{
 				if (i + j >= s.length() || s[i + j] == '0') {
 					t *= 2;
@@ -145,13 +158,16 @@ public:
 					t = t * 2 + 1;
 				}
 			}
-			numbers.push_back(t);
+			
+			h_numbers[l++] = t;
 		}
+		size = l;
+		cudaMemcpy(numbers, h_numbers, sizeof(uint32_t)*((bitLength + SIZEOF) / SIZEOF), cudaMemcpyHostToDevice);
 	}
-	__device__ int bitCount() {
+	__device__ __host__ int bitCount() {
 		int r = 0;
 		unsigned int uCount;
-		for (int i = 0; i < numbers.size(); i++)
+		for (int i = 0; i < size; i++)
 		{
 			uCount= numbers[i] - ((numbers[i] >> 1) & 033333333333) - ((numbers[i] >> 2) & 011111111111);
 			r+= ((uCount + (uCount >> 3)) & 030707070707) % 63;
@@ -159,23 +175,36 @@ public:
 		return r;
 	}
 	__host__ operator string() {
-		host_vector<uint32_t> h_bits = numbers;
+		device_ptr<uint32_t> p(numbers);
+		device_vector<uint32_t> d_bits(p, p + size);
+		host_vector<uint32_t> h_bits = d_bits;
 		string s;
 		s.resize(bitLength);
 		for (int i = 0; i < bitLength; i++)
 		{
-			s[i] = '0' + (h_bits[i / sizeof(uint32_t)] & (1 << (i % sizeof(uint32_t))));
+			s[i] = '0' + (h_bits[i / SIZEOF] & (1 << (i % SIZEOF)));
 		}
 		return s;
 	}
+
 };
-__device__ device_bitset operator ^(const device_bitset &a, const device_bitset &b) {
-	device_bitset r(a.bitLength);
-	for (int i = 0; i < a.numbers.size(); i++)
+//__device__ device_bitset operator ^(const device_bitset &a, const device_bitset &b) {
+//	device_bitset r(a.bitLength);
+//	for (int i = 0; i < a.size; i++)
+//	{
+//		r.numbers[i] = a.numbers[i] ^ b.numbers[i];
+//	}
+//	return r;
+//}
+__device__ int xorBits(const device_bitset&a, const device_bitset &b){
+	int c = 0, uCount;
+	for (int i = 0; i < a.size; i++)
 	{
-		r.numbers[i] = a.numbers[i] ^ b.numbers[i];
+		uint32_t u = a.numbers[i] ^ b.numbers[i];
+		uCount = u - ((u >> 1) & 033333333333) - ((u >> 2) & 011111111111);
+		c += ((uCount + (uCount >> 3)) & 030707070707) % 63;
 	}
-	return r;
+	return c;
 }
 
 __global__ void countKernel(int *pos, const int *ones, int size)
@@ -187,7 +216,7 @@ __global__ void countKernel(int *pos, const int *ones, int size)
 }
 
 __device__ bool match(const device_bitset *words, int a, int b) {
-	return (words[a] ^ words[b]).bitCount() == 1;
+	return xorBits(words[a],words[b]) == 1;
 }
 
 __global__ void findNeighborsKernel(device_bitset *words, int* ones, int *positions, int size, int len, int* res, int* cnt)
@@ -265,7 +294,7 @@ struct Comp {
 
 struct GetRawPtr {
 	__host__ __device__ uint32_t* operator()(device_bitset &s){
-		return raw_pointer_cast(s.numbers.data());
+		return s.numbers;
 	}
 };
 
@@ -279,11 +308,14 @@ struct GetRawPtr {
 
 
 __device__ int counter;
-__global__ void hammingKernel(char* str1, char* str2, int len)
+__global__ void hammingKernel(uint32_t* str1, uint32_t* str2, int len)
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
-	if (i < len && str1[i] != str2[i])
-		atomicAdd(&counter, 1);
+	if (i < len/sizeof(uint32_t) && str1[i] != str2[i]) {
+		uint32_t u = str1[i] ^ str2[i];
+		int uCount = u - ((u >> 1) & 033333333333) - ((u >> 2) & 011111111111);
+		atomicAdd(&counter, ((uCount + (uCount >> 3)) & 030707070707) % 63);
+	}
 }
 
 vector<std::pair<string,string>> cudaFindPairs(host_vector<device_bitset> &words, int size, int len) {
@@ -344,7 +376,7 @@ vector<std::pair<string,string>> cudaFindPairs(host_vector<device_bitset> &words
 				);*/
 				h_counter = 0;
 				cudaMemcpyToSymbol(counter, &h_counter, sizeof(int));
-				hammingKernel << <(len + 256) / 256, 256 >> > (d_bts[i], d_bts[j], len);
+				hammingKernel << <(len/sizeof(uint32_t) + 256) / 256, 256 >> > (d_bts[i], d_bts[j], len);
 				//cudaThreadSynchronize();
 				cudaMemcpyFromSymbol(&h_counter, counter, sizeof(int));
 				if (h_counter == 1) {
@@ -362,6 +394,7 @@ vector<std::pair<string,string>> cudaFindPairs(host_vector<device_bitset> &words
 	{
 		p.push_back(std::make_pair((string)words[pairs[i]], (string)words[pairs[i + 1]]));
 	}
+
 	return p;
 }
 
@@ -400,10 +433,10 @@ int main()
 
 	int size = SIZE;
 	int len = LENGTH;
-	host_vector<device_string> words;
+	host_vector<device_bitset> words;
 
 
-	device_string::init(size,len);
+	
 	cout << "gen\n";
 	readData(words, size, len);
 	cout << "calc 1\n";
@@ -415,6 +448,9 @@ int main()
 	v = hostFindPairs(words, size, len);
 	end = clock();
 	cout << "HOST: " << double(end - begin) / CLOCKS_PER_SEC << endl;
+	for (int i = 0; i < words.size(); i++) {
+		cudaFree(words[i].numbers);
+	}
 	/*for each (auto p in v)
 	{
 		cout << p.first << ' ' << p.second << endl;
