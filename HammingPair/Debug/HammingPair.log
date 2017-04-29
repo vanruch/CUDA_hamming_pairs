@@ -1,28 +1,23 @@
 ﻿  Compiling CUDA source file kernel.cu...
   
   C:\Users\ivanr\documents\visual studio 2015\Projects\HammingPair\HammingPair>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\bin\nvcc.exe" -gencode=arch=compute_30,code=\"sm_30,compute_30\" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2015 -ccbin "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin"  -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include"  -G   --keep-dir Debug -maxrregcount=0  --machine 32 --compile -cudart static  -g   -DWIN32 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /FS /Zi /RTC1 /MDd " -o Debug\kernel.cu.obj "C:\Users\ivanr\documents\visual studio 2015\Projects\HammingPair\HammingPair\kernel.cu" 
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(205): warning : variable "N" was declared but never referenced
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(254): warning : variable "N" was declared but never referenced
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(259): warning : variable "s" was declared but never referenced
-C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include\thrust/detail/allocator/allocator_traits.inl(110): warning : calling a __host__ function from a __host__ __device__ function is not allowed
-C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include\thrust/detail/allocator/allocator_traits.inl(110): warning : calling a __host__ function("std::allocator< ::device_string> ::construct< ::device_string, const  ::device_string & > ") from a __host__ __device__ function("thrust::detail::allocator_traits_detail::construct<std::allocator< ::device_string> ,  ::device_string,  ::device_string> ") is not allowed
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(196): warning : variable "N" was declared but never referenced
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(244): warning : variable "N" was declared but never referenced
 C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include\thrust/system/cuda/detail/synchronize.inl(35): warning : calling a __host__ function("cudaDeviceSynchronize") from a __host__ __device__ function("thrust::system::cuda::detail::synchronize") is not allowed
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(205): warning : variable "N" was declared but never referenced
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(254): warning : variable "N" was declared but never referenced
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(259): warning : variable "s" was declared but never referenced
-C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include\thrust/detail/allocator/allocator_traits.inl(110): warning : calling a __host__ function from a __host__ __device__ function is not allowed
-C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include\thrust/detail/allocator/allocator_traits.inl(110): warning : calling a __host__ function("std::allocator< ::device_string> ::construct< ::device_string, const  ::device_string & > ") from a __host__ __device__ function("thrust::detail::allocator_traits_detail::construct<std::allocator< ::device_string> ,  ::device_string,  ::device_string> ") is not allowed
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(196): warning : variable "N" was declared but never referenced
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(244): warning : variable "N" was declared but never referenced
 C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include\thrust/system/cuda/detail/synchronize.inl(35): warning : calling a __host__ function("cudaDeviceSynchronize") from a __host__ __device__ function("thrust::system::cuda::detail::synchronize") is not allowed
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(205): warning : variable "N" was declared but never referenced
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(254): warning : variable "N" was declared but never referenced
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(259): warning : variable "s" was declared but never referenced
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(196): warning : variable "N" was declared but never referenced
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(244): warning : variable "N" was declared but never referenced
 CUDACOMPILE : nvcc warning : The 'compute_20', 'sm_20', and 'sm_21' architectures are deprecated, and may be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
   kernel.cu
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(82): warning C4018: '<': signed/unsigned mismatch
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(186): warning C4018: '<': signed/unsigned mismatch
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(280): warning C4018: '<': signed/unsigned mismatch
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(287): warning C4018: '<': signed/unsigned mismatch
-C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(310): warning C4018: '<': signed/unsigned mismatch
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(68): warning C4018: '<': signed/unsigned mismatch
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(73): warning C4018: '>=': signed/unsigned mismatch
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(104): warning C4800: 'unsigned int': forcing value to bool 'true' or 'false' (performance warning)
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(266): warning C4018: '<': signed/unsigned mismatch
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(273): warning C4018: '<': signed/unsigned mismatch
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(290): warning C4018: '<': signed/unsigned mismatch
+C:/Users/ivanr/documents/visual studio 2015/Projects/HammingPair/HammingPair/kernel.cu(353): warning C4018: '<': signed/unsigned mismatch
   HammingPair.vcxproj -> C:\Users\ivanr\documents\visual studio 2015\Projects\HammingPair\Debug\HammingPair.exe
   HammingPair.vcxproj -> C:\Users\ivanr\documents\visual studio 2015\Projects\HammingPair\Debug\HammingPair.pdb (Full PDB)
   copy "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\bin\cudart*.dll" "C:\Users\ivanr\documents\visual studio 2015\Projects\HammingPair\Debug\"
