@@ -26,93 +26,12 @@
 #include <thrust\scan.h>
 
 #define SIZE 256
-#define LENGTH 1000
+#define LENGTH 100000
 #define SIZEOF (sizeof(uint32_t)*8)
 using namespace std;
 using namespace thrust;
 
 
-
-
-//class device_string
-//{
-//private:
-//
-//public:
-//	int cstr_len;
-//	int ones=-1;
-//	char* raw;
-//	thrust::device_ptr<char> cstr;
-//	static char* pool_raw;
-//	static thrust::device_ptr<char> pool_cstr;
-//	static thrust::device_ptr<char> pool_top;
-//
-//
-//	__host__ static void init(int size=1024, int len=1024)
-//	{	 
-//		static bool v = true;
-//		if (v)
-//		{
-//			v = false;
-//
-//			const int POOL_SZ = size*len;
-//			cout << "malloc\n";
-//			pool_cstr = thrust::device_malloc<char>(POOL_SZ*2);
-//			cout << "malloc end\n";
-//			pool_raw = (char*)raw_pointer_cast(pool_cstr);
-//
-//			pool_top = pool_cstr;
-//		}
-//	}
-//	__host__ static void fini()
-//	{
-//		init();
-//		thrust::device_free(pool_cstr);
-//	}
-//
-//	__host__ __device__ device_string(const device_string& s)
-//	{
-//		cstr_len = s.cstr_len;
-//		raw = s.raw;
-//		cstr = s.cstr;
-//	}
-//
-//	__host__ __device__ void calcOnes(){
-//		ones = 0;
-//		for (size_t i = 0; i < cstr_len; i++)
-//		{
-//			if (cstr[i] == '1')
-//				ones++;
-//		}
-//	}
-//
-//	__host__ device_string(const std::string& s)
-//		:
-//		cstr_len(s.length())
-//	{
-//		init();
-//
-//		cstr = pool_top;
-//		pool_top += cstr_len + 1;
-//		raw = raw_pointer_cast(cstr);
-//
-//		cudaMemcpy(raw, s.c_str(), cstr_len + 1, cudaMemcpyHostToDevice);
-//	}
-//	__host__ __device__ device_string()
-//		:
-//		cstr_len(-1),
-//		raw(0)
-//	{}
-//
-//
-//
-//	__host__ operator std::string()
-//	{
-//		std::string ret;
-//		thrust::copy(cstr, cstr + cstr_len, back_inserter(ret));
-//		return ret;
-//	}
-//};
 class device_bitset {
 private:
 public:
@@ -182,20 +101,13 @@ public:
 		s.resize(bitLength);
 		for (int i = 0; i < bitLength; i++)
 		{
-			s[i] = '0' + (h_bits[i / SIZEOF] & (1 << (i % SIZEOF)));
+			s[i] = '0' + bool(h_bits[i / SIZEOF] & (1 << (i % SIZEOF)));
 		}
 		return s;
 	}
 
 };
-//__device__ device_bitset operator ^(const device_bitset &a, const device_bitset &b) {
-//	device_bitset r(a.bitLength);
-//	for (int i = 0; i < a.size; i++)
-//	{
-//		r.numbers[i] = a.numbers[i] ^ b.numbers[i];
-//	}
-//	return r;
-//}
+
 __device__ int xorBits(const device_bitset&a, const device_bitset &b){
 	int c = 0, uCount;
 	for (int i = 0; i < a.size; i++)
@@ -251,6 +163,7 @@ void readData(host_vector<device_bitset> &vec, int size, int wordLen) {
 			s.append(rand() % 2 ? "0" : "1");
 		}
 		vec[i] = device_bitset(s);
+
 	}
 	string s;
 	for (int j = 0; j < wordLen; j++)
@@ -298,20 +211,14 @@ struct GetRawPtr {
 	}
 };
 
-//void findPairs(device_vector<device_bitset> &d_words, device_vector<int> &ones, device_vector<int> &positions, int size) {
-//	int* d_pos = thrust::raw_pointer_cast(positions.data());
-//	device_string* str = raw_pointer_cast(d_words.data());
-//	int* d_ones = raw_pointer_cast(ones.data());
-//	cout << "AAAAAAAA\n";
-//	//findNeighborsKernel << <(size + 256) / 256, 256 >> > (str, d_ones, d_pos, size);
-//}
+
 
 
 __device__ int counter;
 __global__ void hammingKernel(uint32_t* str1, uint32_t* str2, int len)
 {
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
-	if (i < len/sizeof(uint32_t) && str1[i] != str2[i]) {
+	if (i < len && str1[i] != str2[i]) {
 		uint32_t u = str1[i] ^ str2[i];
 		int uCount = u - ((u >> 1) & 033333333333) - ((u >> 2) & 011111111111);
 		atomicAdd(&counter, ((uCount + (uCount >> 3)) & 030707070707) % 63);
@@ -339,12 +246,8 @@ vector<std::pair<string,string>> cudaFindPairs(host_vector<device_bitset> &words
 
 	thrust::inclusive_scan(positions.begin(), positions.end(), positions.begin());
 	device_vector<uint32_t*> d_bts = device_vector<uint32_t*>(size);
-	//auto s = device_string::pool_raw;
 	words = d_words;
-	//d_words.clear();
 	thrust::transform(d_words.begin(), d_words.end(), d_bts.begin(), GetRawPtr());
-	//auto t = (&d_words[0]).get()->cstr; 
-	//host_vector<char*> hh = d_str;
 	host_vector<int> pairs;
 	if (size > len) {
 		findNeighborsKernel << <(size + 256) / 256, 256 >> > (bits, d_ones, d_pos, size, len, d_res, d_cnt);
@@ -357,7 +260,7 @@ vector<std::pair<string,string>> cudaFindPairs(host_vector<device_bitset> &words
 		host_vector<int> h_pos = positions;
 
 		pairs = res;
-
+		int l = words[0].size;
 		//words = d_words;
 		int h_counter = 0;
 		for (size_t i = 0; i < size; i++)
@@ -369,29 +272,24 @@ vector<std::pair<string,string>> cudaFindPairs(host_vector<device_bitset> &words
 
 			for (size_t j = from; j < to; j++)
 			{
-				/*c = thrust::count_if(
-				thrust::make_zip_iterator(thrust::make_tuple(s+i*len, s+j*len)),
-				thrust::make_zip_iterator(thrust::make_tuple(s+(i*len + len), s+(j*len + len))),
-				Comp()
-				);*/
+				
 				h_counter = 0;
 				cudaMemcpyToSymbol(counter, &h_counter, sizeof(int));
-				hammingKernel << <(len/sizeof(uint32_t) + 256) / 256, 256 >> > (d_bts[i], d_bts[j], len);
-				//cudaThreadSynchronize();
+				hammingKernel << <(l + 256) / 256, 256 >> > (d_bts[i], d_bts[j], l);
 				cudaMemcpyFromSymbol(&h_counter, counter, sizeof(int));
 				if (h_counter == 1) {
 					pairs[h_cnt] = i;
-					pairs[h_cnt] = j;
+					pairs[h_cnt+1] = j;
 					h_cnt += 2;
 				}
 			}
 		}
 	}
-
+	
 	std::vector<std::pair<string, string>> p;
-	//words = d_words;
 	for (size_t i = 0; i < h_cnt; i += 2)
 	{
+		cout << (string)words[100] << endl;
 		p.push_back(std::make_pair((string)words[pairs[i]], (string)words[pairs[i + 1]]));
 	}
 
@@ -419,7 +317,7 @@ vector<std::pair<string, string>> hostFindPairs(host_vector<device_bitset> &word
 					break;
 			}
 			if (c == 1) {
-				//res.push_back(std::make_pair(w[i], w[j]));
+				res.push_back(std::make_pair(w[i], w[j]));
 			}
 
 		}
@@ -444,6 +342,10 @@ int main()
 	auto v = cudaFindPairs(words, size, len);
 	clock_t end = clock();
 	cout << "CUDA: " << double(end - begin) / CLOCKS_PER_SEC<<endl;
+	for each (auto p in v)
+	{
+	cout << p.first << ' ' << p.second << endl;
+	}
 	begin = clock();
 	v = hostFindPairs(words, size, len);
 	end = clock();
@@ -451,10 +353,10 @@ int main()
 	for (int i = 0; i < words.size(); i++) {
 		cudaFree(words[i].numbers);
 	}
-	/*for each (auto p in v)
+	for each (auto p in v)
 	{
 		cout << p.first << ' ' << p.second << endl;
-	}*/
+	}
 
     return 0;
 }
